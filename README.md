@@ -80,7 +80,9 @@ streamlit run chatbot/chatbot_frontend.py
 
 ## Demo Video
 
-<iframe src="https://drive.google.com/file/d/1xgaL-KEHyvn5Tzmh1WkX8DSVCCnbZyXi/preview" width="640" height="480" allow="autoplay"></iframe>
+[![Watch Demo](https://img.youtube.com/vi/zccNkBaQmko/0.jpg)](https://youtu.be/zccNkBaQmko)
+
+[Click here to watch the demo video](https://youtu.be/zccNkBaQmko)
 
 ---
 
@@ -127,32 +129,32 @@ If MCP tools fail to load (auth/network), the app continues with the fallback to
 
 ```mermaid
 flowchart TD
-  U[User] -->|types message| S[Streamlit UI<br/>chatbot_frontend.py]
+    U[User] -->|types message| S["Streamlit UI<br>chatbot_frontend.py"]
 
-  S -->|invokes astream with thread_id| G[LangGraph App<br/>compiled graph]
+    S -->|invokes astream with thread_id| G["LangGraph App<br>compiled graph"]
 
-  G --> CN[chat_node<br/>LLM call (Groq) + bind_tools]
+    G --> CN["chat_node<br>LLM call Groq and bind_tools"]
 
-  CN --> RT{tool_calls present?<br/>route_tools()}
+    CN --> RT{"tool_calls present?<br>route_tools()"}
 
-  RT -->|No| END[Return assistant message]
-  RT -->|Yes| TN[ToolNode<br/>executes tool]
+    RT -->|No| END[Return assistant message]
+    RT -->|Yes| TN["ToolNode<br>executes tool"]
 
-  TN --> T1[DuckDuckGo Search]
-  TN --> T2[Stock Price<br/>AlphaVantage]
-  TN --> T3[Calculator]
-  TN --> T4[MCP Tools<br/>Expense Tracker<br/>remote FastMCP]
+    TN --> T1[DuckDuckGo Search]
+    TN --> T2["Stock Price<br>AlphaVantage"]
+    TN --> T3[Calculator]
+    TN --> T4["MCP Tools<br>Expense Tracker<br>remote FastMCP"]
 
-  T4 -->|Authorization: Bearer MCP_API_KEY| MCP[(FastMCP Server)]
+    T4 -->|Authorization: Bearer MCP_API_KEY| MCP[(FastMCP Server)]
 
-  TN -->|ToolMessage(s)| CN
+    TN -->|ToolMessage(s)| CN
 
-  G --> CP[(SQLite Checkpointer<br/>AsyncSqliteSaver<br/>chatbot.db)]
-  CN --> CP
-  TN --> CP
+    G --> CP["SQLite Checkpointer<br>AsyncSqliteSaver<br>chatbot.db"]
+    CN --> CP
+    TN --> CP
 
-  END --> S
-  S -->|renders streamed tokens| U
+    END --> S
+    S -->|renders streamed tokens| U
 ```
 
 ---
