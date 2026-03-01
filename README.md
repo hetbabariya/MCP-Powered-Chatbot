@@ -1,76 +1,62 @@
-# Conversational Chatbot (LangGraph + Streamlit + MCP)
+# Conversational Chatbot
 
-A conversational chatbot built with **LangGraph** and **Streamlit**.
+A persistent, multi-tool conversational chatbot built with **LangGraph**, **Streamlit**, and **MCP**.
 
-It supports:
+[![Watch Demo](https://img.youtube.com/vi/zccNkBaQmko/0.jpg)](https://youtu.be/zccNkBaQmko)
 
-- Tool calling via LangChain tool binding (`bind_tools`)
-- A **remote MCP server** (FastMCP “expense tracker” server)
-- **Chat history / short-term memory** via **SQLite checkpointing** (persisted per `thread_id`)
+---
+
+## Features
+
+- **Persistent chat history** — conversations survive app restarts via SQLite checkpointing (per `thread_id`)
+- **Tool calling** — LLM can invoke web search, stock prices, a calculator, and remote MCP tools
+- **Remote MCP integration** — connects to a FastMCP expense tracker server with Bearer auth
+- **Multi-thread UI** — sidebar lists and restores past conversations
 
 ---
 
 ## Project Structure
 
-- `chatbot/chatbot_frontend.py`
-
-  Streamlit UI (chat interface + conversation list).
-
-- `chatbot/chatbot_backend_sqlite.py`
-
-  LangGraph backend:
-
-  - Loads tools (DuckDuckGo, stock price, calculator, and MCP tools)
-  - Routes tool calls through a `ToolNode`
-  - Persists conversation state using `AsyncSqliteSaver` + `chatbot/chatbot.db`
-
-- `chatbot/chatbot.db`
-
-  SQLite database used by LangGraph checkpointer to store conversation checkpoints.
+```
+chatbot/
+├── chatbot_frontend.py        # Streamlit UI (chat interface + conversation sidebar)
+├── chatbot_backend_sqlite.py  # LangGraph graph, tool loading, SQLite checkpointing
+└── chatbot.db                 # SQLite database (auto-created; stores conversation state)
+```
 
 ---
 
-## Requirements
+## Quickstart
 
-Install dependencies:
+### 1. Install dependencies
 
 ```bash
 pip install -r requirements.txt
 ```
 
----
+### 2. Configure environment variables
 
-## Environment Variables
+Create a `.env` file in the project root:
 
-Create a `.env` file in the project root.
+```env
+# Required
+GROQ_API_KEY=...           # LLM provider
+MCP_API_KEY=...            # Remote MCP server (FastMCP) auth
+ALPHAVANTAGE_API_KEY=...   # Stock price tool
 
-Minimum required (based on current code):
-
-```bash
-# Model provider (Groq)
-GROQ_API_KEY=...
-
-# Remote MCP server auth (FastMCP)
-MCP_API_KEY=...
-
-# Stock price tool
-ALPHAVANTAGE_API_KEY=...
-
-# Optional (if you use them elsewhere)
+# Optional
 OPENAI_API_KEY=...
 GOOGLE_API_KEY=...
 HUGGINGFACEHUB_ACCESS_TOKEN=...
+
+# LangSmith tracing (optional)
 LANGSMITH_TRACING=true
 LANGSMITH_ENDPOINT=https://api.smith.langchain.com
 LANGSMITH_API_KEY=...
 LANGSMITH_PROJECT=ChatBot-Project
 ```
 
----
-
-## Run the App (Streamlit)
-
-From the project root:
+### 3. Run the app
 
 ```bash
 streamlit run chatbot/chatbot_frontend.py
@@ -78,89 +64,63 @@ streamlit run chatbot/chatbot_frontend.py
 
 ---
 
-## Demo Video
-
-[![Watch Demo](https://img.youtube.com/vi/zccNkBaQmko/0.jpg)](https://youtu.be/zccNkBaQmko)
-
-[Click here to watch the demo video](https://youtu.be/zccNkBaQmko)
-
----
-
 ## How It Works
 
-### 1) Conversation Threads + History
+### Conversation threads
 
-- The Streamlit UI creates a new `thread_id` (UUID) per chat.
-- The sidebar lists existing threads using `retrieve_all_threads()`.
-- Clicking a thread loads stored messages using `chatbot.get_state({"configurable": {"thread_id": ...}})`.
+Each chat session gets a unique `thread_id` (UUID). The sidebar lists all existing threads; clicking one restores its full message history via `chatbot.get_state({"configurable": {"thread_id": ...}})`. State is persisted using `AsyncSqliteSaver` backed by `chatbot/chatbot.db`.
 
-Because LangGraph is compiled with a SQLite checkpointer, your conversations persist across app restarts.
+### LangGraph graph
 
-### 2) LangGraph Nodes
+The backend compiles a two-node graph:
 
-The backend graph is compiled in `chatbot_backend_sqlite.py`:
+- **`chat_node`** — calls the Groq LLM with tools bound via `bind_tools`
+- **`tools` (ToolNode)** — executes any tool calls the model emits, then loops back to `chat_node`
 
-- `chat_node`
+### Available tools
 
-  Calls the LLM (Groq) and enables tool calling.
+| Tool | Source |
+|---|---|
+| DuckDuckGo search | `DuckDuckGoSearchRun` |
+| Stock price | AlphaVantage API |
+| Calculator | Local function |
+| Expense tracker | Remote FastMCP server (`https://efficient-purple-snipe.fastmcp.app/mcp`) |
 
-- `tools` (ToolNode)
-
-  Executes tools when the model emits tool calls.
-
-### 3) Tools (Tool Binding)
-
-The LLM is configured with tool binding:
-
-- DuckDuckGo search (`DuckDuckGoSearchRun`)
-- Stock price (`get_stock_price` via AlphaVantage)
-- Calculator (`calculator`)
-- Remote MCP tools (loaded via `MultiServerMCPClient`)
-
-Remote MCP server used (from code):
-
-- `https://efficient-purple-snipe.fastmcp.app/mcp`
-
-If MCP tools fail to load (auth/network), the app continues with the fallback tools.
+MCP tools are loaded via `MultiServerMCPClient`. If they fail to load (auth error, network issue), the app falls back gracefully to the remaining tools.
 
 ---
 
-## Workflow Diagram (Mermaid)
+## Architecture
 
 ```mermaid
 flowchart TD
-    U[User] -->|types message| S["Streamlit UI<br>chatbot_frontend.py"]
+    U[User] -->|types message| S["Streamlit UI\nchatbot_frontend.py"]
+    S -->|astream with thread_id| G["LangGraph App"]
 
-    S -->|invokes astream with thread_id| G["LangGraph App<br>compiled graph"]
-
-    G --> CN["chat_node<br>LLM call Groq and bind_tools"]
-
-    CN --> RT{"tool_calls present?<br>route_tools()"}
+    G --> CN["chat_node\nGroq LLM + bind_tools"]
+    CN --> RT{"tool_calls?"}
 
     RT -->|No| END[Return assistant message]
-    RT -->|Yes| TN["ToolNode<br>executes tool"]
+    RT -->|Yes| TN["ToolNode"]
 
     TN --> T1[DuckDuckGo Search]
-    TN --> T2["Stock Price<br>AlphaVantage"]
+    TN --> T2[Stock Price / AlphaVantage]
     TN --> T3[Calculator]
-    TN --> T4["MCP Tools<br>Expense Tracker<br>remote FastMCP"]
+    TN --> T4[MCP Tools / Expense Tracker]
 
-    T4 -->|Authorization: Bearer MCP_API_KEY| MCP[(FastMCP Server)]
+    T4 -->|"Authorization: Bearer MCP_API_KEY"| MCP[(FastMCP Server)]
+    TN -->|ToolMessage| CN
 
-    TN -->|ToolMessage(s)| CN
-
-    G --> CP["SQLite Checkpointer<br>AsyncSqliteSaver<br>chatbot.db"]
-    CN --> CP
-    TN --> CP
-
-    END --> S
-    S -->|renders streamed tokens| U
+    CN & TN --> CP["AsyncSqliteSaver\nchatbot.db"]
+    END --> S --> U
 ```
 
 ---
 
-## Notes / Troubleshooting
+## Troubleshooting
 
-- If MCP tools do not load, ensure `MCP_API_KEY` is set and the MCP server URL is reachable.
-- If AlphaVantage responses fail, check `ALPHAVANTAGE_API_KEY`.
-- Chat history is stored in `chatbot/chatbot.db`. Deleting it will remove saved threads.
+**MCP tools not loading** — verify `MCP_API_KEY` is set and `https://efficient-purple-snipe.fastmcp.app/mcp` is reachable.
+
+**Stock price errors** — check that `ALPHAVANTAGE_API_KEY` is valid and not rate-limited.
+
+**Lost conversations** — chat history lives in `chatbot/chatbot.db`. Deleting this file clears all threads.
