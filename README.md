@@ -80,9 +80,7 @@ streamlit run chatbot/chatbot_frontend.py
 
 ## Demo Video
 
-Google Drive link:
-
-https://drive.google.com/file/d/1xgaL-KEHyvn5Tzmh1WkX8DSVCCnbZyXi/view?usp=drive_link
+<iframe src="https://drive.google.com/file/d/1xgaL-KEHyvn5Tzmh1WkX8DSVCCnbZyXi/preview" width="640" height="480" allow="autoplay"></iframe>
 
 ---
 
@@ -129,27 +127,27 @@ If MCP tools fail to load (auth/network), the app continues with the fallback to
 
 ```mermaid
 flowchart TD
-  U[User] -->|types message| S[Streamlit UI\nchatbot_frontend.py]
+  U[User] -->|types message| S[Streamlit UI<br/>chatbot_frontend.py]
 
-  S -->|invokes astream with thread_id| G[LangGraph App\ncompiled graph]
+  S -->|invokes astream with thread_id| G[LangGraph App<br/>compiled graph]
 
-  G --> CN[chat_node\nLLM call (Groq) + bind_tools]
+  G --> CN[chat_node<br/>LLM call (Groq) + bind_tools]
 
-  CN --> RT{tool_calls present?\nroute_tools()}
+  CN --> RT{tool_calls present?<br/>route_tools()}
 
   RT -->|No| END[Return assistant message]
-  RT -->|Yes| TN[ToolNode\nexecutes tool]
+  RT -->|Yes| TN[ToolNode<br/>executes tool]
 
   TN --> T1[DuckDuckGo Search]
-  TN --> T2[Stock Price\nAlphaVantage]
+  TN --> T2[Stock Price<br/>AlphaVantage]
   TN --> T3[Calculator]
-  TN --> T4[MCP Tools\nExpense Tracker\nremote FastMCP]
+  TN --> T4[MCP Tools<br/>Expense Tracker<br/>remote FastMCP]
 
   T4 -->|Authorization: Bearer MCP_API_KEY| MCP[(FastMCP Server)]
 
   TN -->|ToolMessage(s)| CN
 
-  G --> CP[(SQLite Checkpointer\nAsyncSqliteSaver\nchatbot.db)]
+  G --> CP[(SQLite Checkpointer<br/>AsyncSqliteSaver<br/>chatbot.db)]
   CN --> CP
   TN --> CP
 
